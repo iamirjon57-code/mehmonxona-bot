@@ -28,7 +28,11 @@ EXPENSE_CATS = [
     "💧 Suv", "⚡ Elektr", "🔥 Gaz", "🌐 Internet",
     "🍔 Ovqat", "🚌 Transport", "🏥 Sog'liq",
     "🛍 Xarid", "📚 Ta'lim", "🏠 Uy xarajat",
-    "🔧 Ta'mirlash", "👷 Ish haqi", "📦 Boshqa", "🔙 Orqaga"
+    "🔧 Ta'mirlash", "🐈 Semxon", "📦 Boshqa", "🔙 Orqaga"
+]
+
+INCOME_CATS = [
+    "👷 Ish haqi", "💼 Boshqa", "🔙 Orqaga"
 ]
 
 XONA_TURLARI = [
@@ -62,8 +66,10 @@ def reception_faq(topic):
             "📅 Kelish sanasi\n📅 Ketish sanasi\n"
             "👥 Mehmonlar soni\n🛏️ Xona turi\n\n"
             "📞 Tel: +998 99 583 18 28\n\n"
-            "⚠️ *MUHIM:*\nXonaga kirish uchun asl *PASPORT* talab qilinadi!\n"
-            "ID karta qabul qilinmaydi. 🪪"
+            "⚠️ *MUHIM:*\nXonaga kirish *PASPORT* asosida amalga oshiriladi.\n"
+            "👥 2 kishilik xonada — ikkala mehmonda ham pasport bo'lishi shart.\n"
+            "🪪 Pasport, uning rasmi yoki *MyGov* ilovasidan ko'rsatish ham qabul qilinadi.\n"
+            "ID karta qabul qilinmaydi."
         )
     elif topic == "checkin":
         return (
@@ -79,9 +85,10 @@ def reception_faq(topic):
     elif topic == "pasport":
         return (
             "🪪 *Pasport talabi — MUHIM:*\n\n"
-            "Xona faqat *asl PASPORT* asosida beriladi.\n\n"
-            "❌ Qabul qilinmaydi:\n  • ID karta\n  • Haydovchilik guvohnomasi\n\n"
-            "✅ Faqat asl pasport qabul qilinadi."
+            "Xona *PASPORT* asosida beriladi.\n\n"
+            "👥 2 kishilik xonada — ikkala mehmonda ham pasport bo'lishi shart.\n\n"
+            "✅ Qabul qilinadi:\n  • Asl pasport\n  • Pasport rasmi (surati)\n  • *MyGov* ilovasidan ko'rsatilgan pasport\n\n"
+            "❌ Qabul qilinmaydi:\n  • ID karta\n  • Haydovchilik guvohnomasi"
         )
     elif topic == "manzil":
         return (
@@ -171,8 +178,8 @@ QOIDALAR = [
 ]
 
 (MENU, HOTEL_SELECT, HOTEL_AMOUNT,
- INCOME_AMOUNT, EXPENSE_CAT, EXPENSE_AMOUNT,
- TASK_TEXT, TASK_TIME, BUDGET_SET, WEIGHT_LOG) = range(10)
+ INCOME_CAT, INCOME_AMOUNT, EXPENSE_CAT, EXPENSE_AMOUNT,
+ TASK_TEXT, TASK_TIME, BUDGET_SET, WEIGHT_LOG) = range(11)
 
 def load_data():
     if os.path.exists(DATA_FILE):
@@ -213,13 +220,18 @@ def expense_kb():
     rows = [EXPENSE_CATS[i:i+2] for i in range(0, len(EXPENSE_CATS), 2)]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
+def income_kb():
+    rows = [INCOME_CATS[i:i+2] for i in range(0, len(INCOME_CATS), 2)]
+    return ReplyKeyboardMarkup(rows, resize_keyboard=True)
+
 async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     data = load_data()
     get_user(data, update.effective_user.id)
     save_data(data)
     await update.message.reply_text(
         f"Assalomu alaykum, *{update.effective_user.first_name}*! 👋\n\n"
-        "🏨 *FinPlanner Pro MAX*\n\n"
+        "🏨 *FinPlanner Pro MAX*\n"
+        "━━━━━━━━━━━━━━━\n\n"
         "• 🏨 Mehmonxona daromadlari\n"
         "• 📈 Grafik hisobotlar\n"
         "• 🥗 Sog'liq va retseptlar\n"
@@ -240,7 +252,8 @@ async def reception_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("📞 Kontakt",               callback_data="rec_kontakt")],
     ])
     await update.message.reply_text(
-        "🛎️ *Mehmonxona Reception Bot*\n\n"
+        "🛎️ *Mehmonxona Reception Bot*\n"
+        "━━━━━━━━━━━━━━━\n\n"
         "Assalomu alaykum! Sizga qanday yordam bera olaman?\n\n"
         "⚠️ Xonaga kirish uchun *PASPORT* talab qilinadi!",
         parse_mode="Markdown", reply_markup=kb)
@@ -320,7 +333,7 @@ async def health_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("📊 Vazn grafigi",         callback_data="vazn_grafik")],
         [InlineKeyboardButton("🍽 Kunlik menyu",         callback_data="kunlik_menyu")],
     ])
-    await update.message.reply_text("🥗 *Sog'liq & Ovqatlanish*\nNimani ko'rmoqchisiz?",
+    await update.message.reply_text("🥗 *Sog'liq & Ovqatlanish*\n━━━━━━━━━━━━━━━\nNimani ko'rmoqchisiz?",
         parse_mode="Markdown", reply_markup=kb)
     return MENU
 
@@ -417,17 +430,27 @@ async def hotel_amount_save(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown", reply_markup=MAIN_KB); return MENU
 
 async def other_income_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("💵 Daromad miqdori:"); return INCOME_AMOUNT
+    await update.message.reply_text("📂 Daromad turi:", reply_markup=income_kb()); return INCOME_CAT
+
+async def income_cat_select(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    txt = update.message.text
+    if txt == "🔙 Orqaga":
+        await update.message.reply_text("Asosiy menyu:", reply_markup=MAIN_KB); return MENU
+    if txt not in INCOME_CATS:
+        await update.message.reply_text("Menyudan tanlang:", reply_markup=income_kb()); return INCOME_CAT
+    ctx.user_data["income_cat"] = txt
+    await update.message.reply_text(f"*{txt}* miqdori:", parse_mode="Markdown"); return INCOME_AMOUNT
 
 async def other_income_save(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     try: amount = float(update.message.text.replace(",","").replace(" ",""))
     except: await update.message.reply_text("❌ Noto'g'ri:"); return INCOME_AMOUNT
     data = load_data(); u = get_user(data, update.effective_user.id)
+    cat = ctx.user_data.get("income_cat","💼 Boshqa")
     today = datetime.date.today().strftime("%d.%m.%Y"); month = datetime.date.today().strftime("%Y-%m")
     u["balance"] += amount; u["income"] += amount
-    u["transactions"].append({"type":"income","amount":amount,"category":"💼 Boshqa","date":today,"month":month})
+    u["transactions"].append({"type":"income","amount":amount,"category":cat,"date":today,"month":month})
     save_data(data)
-    await update.message.reply_text(f"✅ `{amount:,.0f} so'm`\n💼 Balans: `{u['balance']:,.0f}`",
+    await update.message.reply_text(f"✅ *{cat}*\n`{amount:,.0f} so'm`\n💼 Balans: `{u['balance']:,.0f}`",
         parse_mode="Markdown", reply_markup=MAIN_KB); return MENU
 
 async def expense_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -457,7 +480,8 @@ async def expense_amount_save(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def show_balance(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     data = load_data(); u = get_user(data, update.effective_user.id)
     today = datetime.date.today().strftime("%d.%m.%Y")
-    msg = (f"💼 *Moliyaviy holat* — {today}\n\n"
+    msg = (f"💼 *Moliyaviy holat* — {today}\n"
+           f"━━━━━━━━━━━━━━━\n\n"
            f"💚 Daromad: `{u['income']:,.0f} so'm`\n"
            f"❤️ Xarajat: `{u['expense']:,.0f} so'm`\n"
            f"━━━━━━━━━━━━━━━\n"
@@ -502,7 +526,7 @@ async def show_graph(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("📆 Oylik taqqoslama",    callback_data="graph_monthly")],
         [InlineKeyboardButton("💸 Xarajat taqsimoti",  callback_data="graph_expense")],
     ])
-    await update.message.reply_text("📈 *Grafik:*", parse_mode="Markdown", reply_markup=kb); return MENU
+    await update.message.reply_text("📈 *Grafik*\n━━━━━━━━━━━━━━━", parse_mode="Markdown", reply_markup=kb); return MENU
 
 async def graph_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query; await q.answer()
@@ -553,7 +577,7 @@ async def show_report(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🏨 Mehmonxonalar", callback_data="rep_hotels")],
         [InlineKeyboardButton("📋 Oxirgi 10 ta",  callback_data="rep_last10")],
     ])
-    await update.message.reply_text("📊 *Hisobot:*", parse_mode="Markdown", reply_markup=kb); return MENU
+    await update.message.reply_text("📊 *Hisobot*\n━━━━━━━━━━━━━━━", parse_mode="Markdown", reply_markup=kb); return MENU
 
 async def report_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query; await q.answer()
@@ -590,7 +614,7 @@ async def show_tasks(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not u["tasks"]:
         await update.message.reply_text("📋 Vazifalar bo'sh.", reply_markup=kb); return MENU
     lines="\n".join(f"{'✅' if t.get('done') else '⬜'} {t.get('time','?')} — {t['text']}" for t in u["tasks"])
-    await update.message.reply_text(f"📋 *Vazifalar*\n\n{lines}", parse_mode="Markdown", reply_markup=kb); return MENU
+    await update.message.reply_text(f"📋 *Vazifalar*\n━━━━━━━━━━━━━━━\n\n{lines}", parse_mode="Markdown", reply_markup=kb); return MENU
 
 async def task_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     q=update.callback_query; await q.answer()
@@ -617,7 +641,8 @@ async def task_time_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def show_schedule(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     today=datetime.date.today()
     wdays=["Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba","Yakshanba"]
-    msg=(f"📅 *{today.strftime('%d.%m.%Y')} — {wdays[today.weekday()]}*\n\n"
+    msg=(f"📅 *{today.strftime('%d.%m.%Y')} — {wdays[today.weekday()]}*\n"
+         f"━━━━━━━━━━━━━━━\n\n"
          f"🌅 07:00 — Vazn o'lchash\n  07:15 — Mashqlar\n  08:00 — Nonushta\n\n"
          f"☀️ 12:00 — Daromad kiritish\n  13:00 — Tushlik\n\n"
          f"🌆 17:00 — Xarajat kiritish\n  19:00 — Kechki ovqat\n  20:00 — 🚫 Ovqat tugaydi\n  22:00 — 😴 Uxlash")
@@ -627,7 +652,7 @@ async def settings(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     data=load_data(); u=get_user(data,update.effective_user.id)
     kb=InlineKeyboardMarkup([[InlineKeyboardButton("💰 Byudjet", callback_data="set_budget"),
                                InlineKeyboardButton("🗑 Tozalash", callback_data="clear_all")]])
-    await update.message.reply_text(f"⚙️ *Sozlamalar*\n💰 Byudjet: `{u['budget_limit']:,.0f}`",
+    await update.message.reply_text(f"⚙️ *Sozlamalar*\n━━━━━━━━━━━━━━━\n💰 Byudjet: `{u['budget_limit']:,.0f}`",
         parse_mode="Markdown", reply_markup=kb); return MENU
 
 async def settings_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -709,6 +734,7 @@ def main():
             ],
             HOTEL_SELECT:[MessageHandler(filters.TEXT&~filters.COMMAND,hotel_select)],
             HOTEL_AMOUNT:[MessageHandler(filters.TEXT&~filters.COMMAND,hotel_amount_save)],
+            INCOME_CAT:[MessageHandler(filters.TEXT&~filters.COMMAND,income_cat_select)],
             INCOME_AMOUNT:[MessageHandler(filters.TEXT&~filters.COMMAND,other_income_save)],
             EXPENSE_CAT:[MessageHandler(filters.TEXT&~filters.COMMAND,expense_cat_select)],
             EXPENSE_AMOUNT:[MessageHandler(filters.TEXT&~filters.COMMAND,expense_amount_save)],
