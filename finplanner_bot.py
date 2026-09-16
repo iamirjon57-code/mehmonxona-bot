@@ -28,7 +28,7 @@ EXPENSE_CATS = [
     "💧 Suv", "⚡ Elektr", "🔥 Gaz", "🌐 Internet",
     "🍔 Ovqat", "🚌 Transport", "🏥 Sog'liq",
     "🛍 Xarid", "📚 Ta'lim", "🏠 Uy xarajat",
-    "🔧 Ta'mirlash", "🐈 Semxon", "📦 Boshqa", "🔙 Orqaga"
+    "🔧 Ta'mirlash", "🐈 Semxon", "🔑 Ijara haqi", "👩 Apa Marjona", "📦 Boshqa", "🔙 Orqaga"
 ]
 
 INCOME_CATS = [
@@ -68,8 +68,7 @@ def reception_faq(topic):
             "📞 Tel: +998 99 583 18 28\n\n"
             "⚠️ *MUHIM:*\nXonaga kirish *PASPORT* asosida amalga oshiriladi.\n"
             "👥 2 kishilik xonada — ikkala mehmonda ham pasport bo'lishi shart.\n"
-            "🪪 Pasport, uning rasmi yoki *MyGov* ilovasidan ko'rsatish ham qabul qilinadi.\n"
-            "ID karta qabul qilinmaydi."
+            "🪪 Pasport, uning rasmi, *MyGov* ilovasi, ID karta yoki haydovchilik guvohnomasi bilan ham qabul qilinadi."
         )
     elif topic == "checkin":
         return (
@@ -87,8 +86,7 @@ def reception_faq(topic):
             "🪪 *Pasport talabi — MUHIM:*\n\n"
             "Xona *PASPORT* asosida beriladi.\n\n"
             "👥 2 kishilik xonada — ikkala mehmonda ham pasport bo'lishi shart.\n\n"
-            "✅ Qabul qilinadi:\n  • Asl pasport\n  • Pasport rasmi (surati)\n  • *MyGov* ilovasidan ko'rsatilgan pasport\n\n"
-            "❌ Qabul qilinmaydi:\n  • ID karta\n  • Haydovchilik guvohnomasi"
+            "✅ Qabul qilinadi:\n  • Asl pasport\n  • Pasport rasmi (surati)\n  • *MyGov* ilovasidan ko'rsatilgan pasport\n  • ID karta\n  • Haydovchilik guvohnomasi"
         )
     elif topic == "manzil":
         return (
