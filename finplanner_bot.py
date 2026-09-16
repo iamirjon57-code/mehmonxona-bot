@@ -21,6 +21,7 @@ HOTELS = [
     "🏨 Temur Hotel",
     "🏨 Al Buxari Hotel",
     "🏨 Al Fayz Hotel",
+    "🏨 Joyzar Hotel",
 ]
 
 EXPENSE_CATS = [
@@ -467,11 +468,32 @@ async def show_balance(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         msg += "\n\n🏨 *Top mehmonxonalar:*\n"
         for i,(h,v) in enumerate(top3):
             msg += f"{'🥇🥈🥉'[i]} {h}: `{v:,.0f}` ({v/total*100:.0f}%)\n"
+    msg += expense_advice(u)
     await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=MAIN_KB); return MENU
 
 def build_bar(value, max_val, width=10):
     if max_val == 0: return "░"*width
     return "█"*int((value/max_val)*width) + "░"*(width-int((value/max_val)*width))
+
+def expense_advice(u):
+    month = datetime.date.today().strftime("%Y-%m")
+    cats = {}
+    for t in u["transactions"]:
+        if t["type"] == "expense" and t.get("month") == month:
+            cats[t["category"]] = cats.get(t["category"], 0) + t["amount"]
+    if not cats:
+        return ""
+    total_exp = sum(cats.values())
+    top_cat, top_val = max(cats.items(), key=lambda x: x[1])
+    pct = (top_val/total_exp*100) if total_exp else 0
+    msg = (f"\n\n⚠️ *Tavsiya:* Bu oyda eng ko'p xarajat — *{top_cat}* "
+           f"(`{top_val:,.0f} so'm`, {pct:.0f}%). Shu toifani kamaytirishga harakat qiling.")
+    if u["expense"] > u["income"]:
+        msg += "\n🔴 *Diqqat:* umumiy xarajatlaringiz daromadingizdan oshib ketmoqda!"
+    budget = u.get("budget_limit", 0)
+    if budget and total_exp > budget:
+        msg += f"\n🟠 Bu oy byudjetdan (`{budget:,.0f}`) `{total_exp-budget:,.0f} so'm` oshib ketdingiz."
+    return msg
 
 async def show_graph(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     kb = InlineKeyboardMarkup([
@@ -500,6 +522,19 @@ async def graph_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         max_v = max(daily.values()) or 1
         lines = [f"`{d[:5]}` {build_bar(v,max_v,10)} `{v/1000:.0f}k`" for d,v in daily.items()]
         await q.message.reply_text("📅 *Kunlik daromad*\n\n" + "\n".join(lines), parse_mode="Markdown")
+    elif q.data == "graph_monthly":
+        monthly = {}
+        for t in u["transactions"]:
+            m = t.get("month","?")
+            monthly.setdefault(m, {"income":0,"expense":0})
+            monthly[m][t["type"]] += t["amount"]
+        if not monthly: await q.message.reply_text("📭 Ma'lumot yo'q."); return MENU
+        months = sorted(monthly.keys())[-6:]
+        max_v = max(max(monthly[m]["income"], monthly[m]["expense"]) for m in months) or 1
+        lines = [f"`{m}`\n💚{build_bar(monthly[m]['income'],max_v,10)} `{monthly[m]['income']:,.0f}`\n"
+                 f"❤️{build_bar(monthly[m]['expense'],max_v,10)} `{monthly[m]['expense']:,.0f}`"
+                 for m in months]
+        await q.message.reply_text("📆 *Oylik taqqoslama*\n\n" + "\n\n".join(lines), parse_mode="Markdown")
     elif q.data == "graph_expense":
         cats = {}
         for t in u["transactions"]:
