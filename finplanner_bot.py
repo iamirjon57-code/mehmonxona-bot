@@ -9,7 +9,9 @@ from telegram.ext import (Application, CommandHandler, MessageHandler,
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 BOT_TOKEN = "8804626503:AAEAGQgsN-SkPCa5Y_rmEVe6GMdZQrgvT-E"
-DATA_FILE  = "data.json"
+DATA_DIR = "/app/data"
+os.makedirs(DATA_DIR, exist_ok=True)
+DATA_FILE = os.path.join(DATA_DIR, "data.json")
 
 HOTELS = [
     "🏨 Golden Degrez Hotel",
