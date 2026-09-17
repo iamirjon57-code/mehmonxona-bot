@@ -2,7 +2,8 @@
 FinPlanner Pro MAX — Mehmonxona + Moliya + Sog'liq + Retseptlar + Reception Bot
 """
 
-import os, json, datetime, random
+import os, json, re, datetime, random
+from collections import Counter
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (Application, CommandHandler, MessageHandler,
     CallbackQueryHandler, ContextTypes, filters, ConversationHandler)
@@ -301,6 +302,167 @@ GURUH_KEYWORDS = {
     ("telefon","kontakt","aloqa"): "kontakt",
 }
 
+FAQ_LIST = [
+    # 1. Bandlash va rezervatsiya
+    ("Xonani qanday bron qilsam bo'ladi?", "Telegram bot, Instagram DM yoki telefon orqali (+998 99 583 18 28) bron qiling; sana, xona turi va mehmonlar sonini ayting, biz qisqa vaqt ichida tasdiqlaymiz."),
+    ("Bron qilish uchun oldindan to'lov kerakmi?", "Ha, odatda umumiy summaning 20-30% miqdorida oldindan to'lov so'raladi, qolgani kelganingizda to'lanadi."),
+    ("Onlayn bron qilish imkoniyati bormi?", "Ha, Telegram botimiz orqali xonalar katalogidan tanlab, to'g'ridan-to'g'ri bron qilishingiz mumkin."),
+    ("Bir necha xonani bitta bron qilib bo'ladimi?", "Ha, guruh yoki oilaviy safar uchun bir nechta xonani bitta bron ostida rasmiylashtiramiz, guruh chegirmasi haqida so'rang."),
+    ("Bron qilinganini qanday tasdiqlayman?", "Bron qilingandan so'ng botdan yoki administratordan yozma tasdiqnoma (booking confirmation) olasiz."),
+    ("Bron qilishda qaysi ma'lumotlarni taqdim etishim kerak?", "Ism-familiya, telefon raqami, kelish-ketish sanalari, mehmonlar soni va xona turi."),
+    ("Oxirgi daqiqada (last-minute) bron qilsa bo'ladimi?", "Bo'sh xona mavjud bo'lsa, hatto kelish kunining o'zida ham bron qilish mumkin, botdan bo'sh joylarni tekshiring."),
+    ("Bayram va sayyohlik mavsumida xona topish qiyinmi?", "Yuqori mavsumda (bahor-kuz) xonalar tez to'lib qoladi, shuning uchun kamida 1-2 hafta oldin bron qilishni tavsiya qilamiz."),
+    ("Bron qilingan sanani o'zgartirsam bo'ladimi?", "Ha, kelish sanasidan kamida 24 soat oldin xabar bersangiz, bepul o'zgartirib beramiz."),
+    ("Bron qilish uchun qaysi kanal orqali murojaat qilsam bo'ladi?", "@bezzakshotelbuxoro yoki @hotelbuxhara Telegram kanallarimiz, shuningdek Instagram sahifamiz orqali murojaat qiling."),
+    # 2. Xonalar va ularning sharoiti
+    ("Qanday xona turlari mavjud?", "Standart, Komfort (Deluxe) va Lyuks (Suite) xonalar, bir kishilik va ikki kishilik variantlarda mavjud."),
+    ("Xonalarda konditsioner bormi?", "Ha, barcha xonalarda konditsioner va isitish tizimi o'rnatilgan."),
+    ("Xonada shaxsiy hammom bormi?", "Ha, har bir xonada issiq suv bilan ta'minlangan shaxsiy hammom va dush mavjud."),
+    ("Xonalarda televizor va Wi-Fi bormi?", "Ha, barcha xonalarda televizor va bepul Wi-Fi mavjud."),
+    ("Xona qancha kvadrat metr?", "Standart xonalar taxminan 16-18 m², Lyuks xonalar 25-30 m² atrofida."),
+    ("Xonadan hovli yoki ko'cha ko'rinishi tanlash mumkinmi?", "Ha, bron qilishda ko'rinish (hovli/ko'cha) bo'yicha talabingizni bildirsangiz, imkon darajasida hisobga olamiz."),
+    ("Xonalarda minibar yoki muzlatgich bormi?", "Lyuks xonalarda minibar mavjud, standart xonalarda so'rov asosida kichik muzlatgich qo'yiladi."),
+    ("Xonalar necha kishilik?", "1, 2 yoki 3 kishilik xonalar mavjud, oilaviy xonalarda qo'shimcha yotoq o'rnatish mumkin."),
+    ("Xonada seyf (saqlash qutisi) bormi?", "Lyuks xonalarda seyf mavjud, boshqa xonalarda qimmatbaho buyumlaringizni administratorga saqlashga topshirishingiz mumkin."),
+    ("Xonalar necha marta tozalanadi?", "Xonalar har kuni tozalanadi, choyshab va sochiqlar 2 kunda bir marta almashtiriladi (talab bo'yicha tezroq ham mumkin)."),
+    # 3. Narxlar va to'lov usullari
+    ("Bir kechalik narx qancha?", "Narx xona turiga va mavsumga qarab farq qiladi; aniq narxni @hotelbuxhara narxlar kanalidan yoki botdan bilib olishingiz mumkin."),
+    ("Narxga nonushta kiradimi?", "Ko'pchilik tariflarda ha, bron qilishda aniq shartni tekshirib oling."),
+    ("To'lovni qanday amalga oshirsam bo'ladi?", "Naqd pul, plastik karta (UzCard/Humo) yoki bank o'tkazmasi orqali to'lash mumkin."),
+    ("Chet el valyutasida to'lash mumkinmi?", "Ha, dollar yoki so'mda to'lash mumkin, kurs kunlik markaziy bank kursi bo'yicha hisoblanadi."),
+    ("Uzoq muddat yashasam chegirma bormi?", "Ha, 7 kundan ortiq turadigan mehmonlarga individual chegirma taqdim etiladi, administrator bilan bog'laning."),
+    ("Guruh yoki turfirmalar uchun maxsus narx bormi?", "Ha, guruh bandlovlari va turfirmalar bilan hamkorlik uchun maxsus shartnoma narxlari mavjud."),
+    ("Bolalar uchun qo'shimcha to'lov olinadimi?", "6 yoshgacha bo'lgan bolalar bepul, 6-12 yosh oralig'ida chegirmali qo'shimcha to'lov olinadi."),
+    ("Turistik soliq yoki qo'shimcha yig'im bormi?", "Narxga barcha soliqlar kiritilgan, qo'shimcha yashirin to'lov yo'q."),
+    ("To'lov kvitansiyasi (chek) berasizlarmi?", "Ha, har bir to'lov uchun rasmiy chek yoki hisob-faktura beramiz."),
+    ("Karta orqali oldindan onlayn to'lov qilsa bo'ladimi?", "Ha, Telegram bot orqali onlayn to'lov havolasi yuboriladi, karta orqali xavfsiz to'lashingiz mumkin."),
+    # 4. Bekor qilish, o'zgartirish va pul qaytarish
+    ("Bronni bekor qilsam pulim qaytariladimi?", "Kelish sanasidan 48 soat oldin bekor qilsangiz, oldindan to'lovning to'liq summasi qaytariladi."),
+    ("Kech bekor qilsam nima bo'ladi?", "24 soatdan kam vaqt qolganda bekor qilinsa, oldindan to'lovning bir qismi ushlab qolinishi mumkin."),
+    ("Kelmay qolsam (no-show) pul qaytariladimi?", "Yo'q, oldindan xabarsiz kelmay qolingan holatda oldindan to'lov qaytarilmaydi."),
+    ("Bron sanasini bepul o'zgartirish mumkinmi?", "Ha, kelishdan kamida 24 soat oldin murojaat qilsangiz, sanani bepul ko'chirib beramiz."),
+    ("Xona turini boshqasiga almashtirsam bo'ladimi?", "Bo'sh joy mavjud bo'lsa, kelishdan oldin yoki hatto kelgan kuningizda ham xona turini o'zgartirish mumkin."),
+    ("Pul qaytarish necha kun ichida amalga oshadi?", "Bekor qilingandan so'ng 3-5 ish kuni ichida to'lov usulingizga qarab pul qaytariladi."),
+    ("Favqulodda holatlar (kasallik, parvoz bekor bo'lishi) uchun istisno bormi?", "Ha, hujjat bilan tasdiqlangan favqulodda holatlarda individual tarzda ko'rib chiqamiz."),
+    ("Bron shartlarini qayerdan bilib olsam bo'ladi?", "Bron tasdiqlash xabarida bekor qilish va o'zgartirish shartlari aniq ko'rsatiladi."),
+    # 5. Kelish (check-in) va ketish (check-out)
+    ("Check-in va check-out vaqti nechada?", "Check-in soat 14:00 dan, check-out soat 12:00 gacha."),
+    ("Erta check-in yoki kech check-out qilsa bo'ladimi?", "Bo'sh xona mavjud bo'lsa, bepul yoki kichik qo'shimcha to'lov evaziga imkoniyat yaratamiz, oldindan so'rang."),
+    ("Kechqurun kech kelsam (masalan tunda) muammo bo'lmaydimi?", "Yo'q, resepshn kunning istalgan vaqtida sizni kutib oladi, faqat kelish vaqtingizni oldindan xabar qiling."),
+    ("Check-in uchun qanday hujjat kerak?", "Pasport yoki shaxsni tasdiqlovchi hujjat asl nusxasi kerak bo'ladi (chet ellik mehmonlar uchun ham pasport yetarli)."),
+    ("Yuklarimni check-out dan keyin saqlab turasizlarmi?", "Ha, ketish kuni parvozgacha vaqtingiz bo'lsa, yuklaringizni bepul saqlab turamiz."),
+    ("Bir nechta mehmon bitta xonaga qo'shilib check-in qilishi mumkinmi?", "Ha, barcha mehmonlarning ma'lumotlari ro'yxatga olinishi sharti bilan mumkin."),
+    ("Aeroportdan/vokzaldan to'g'ridan-to'g'ri kelib check-in qilsam bo'ladimi?", "Ha, agar xona tayyor bo'lsa darhol joylashtiramiz, aks holda kutish zonasida kutib turishingiz mumkin."),
+    ("Check-out paytida xona holatini tekshirasizlarmi?", "Ha, xodimlarimiz xonani tezda ko'zdan kechiradi, bu odatda bir necha daqiqa vaqt oladi."),
+    # 6. Manzil, transport va yetib borish
+    ("Mehmonxona Buxoroning qayerida joylashgan?", "Buxoro shahar markaziga yaqin joylashgan, tarixiy diqqatga sazovor joylargacha piyoda yoki qisqa yo'l bilan yetish mumkin (aniq manzil bron tasdiqnomasida ko'rsatiladi)."),
+    ("Aeroportdan mehmonxonagacha qancha masofa?", "Buxoro xalqaro aeroportidan taxminan 10-15 daqiqalik yo'l (mashinada)."),
+    ("Temir yo'l vokzalidan qanday yetib kelsam bo'ladi?", "Taksi bilan 15-20 daqiqada yetib kelasiz, so'rov bo'lsa transfer tashkil qilib beramiz."),
+    ("Aeroport yoki vokzaldan transfer xizmati bormi?", "Ha, oldindan buyurtma bergan mehmonlar uchun pullik transfer xizmati mavjud."),
+    ("Mehmonxona yaqinida bepul avtoturargoh bormi?", "Ha, mehmonlar uchun bepul avtoturargoh joyi mavjud."),
+    ("Shahar markaziga (Lyabi-Hovuz, Ark qal'asi) yetib borish qulaymi?", "Ha, ko'pchilik diqqatga sazovor joylar piyoda 10-20 daqiqa masofada joylashgan."),
+    ("Taksi chaqirish uchun yordam berasizlarmi?", "Ha, resepshn xodimlari ishonchli taksi xizmatini chaqirib beradi yoki Yandex Go orqali buyurtma berishga yordamlashadi."),
+    ("Boshqa shaharlardan (Toshkent, Samarqand) qanday yetib kelsam bo'ladi?", "Poyezd (Afrosiyob/Sharq), samolyot yoki avtobus orqali Buxoroga yetib, yuqoridagi transfer variantlaridan foydalanishingiz mumkin."),
+    # 7. Nonushta va ovqatlanish
+    ("Nonushta soat nechada beriladi?", "Nonushta har kuni soat 07:00 dan 10:00 gacha xizmat qiladi."),
+    ("Nonushta narxga kiradimi?", "Ko'pchilik tariflarda ha, bron qilishda aniq shartni tekshirib oling."),
+    ("Milliy taomlar bilan tanishtirasizlarmi?", "Ha, nonushtada mahalliy Buxoro taomlari (non, choy, murabbo, tuxum taomlari) taqdim etiladi."),
+    ("Tushlik va kechki ovqat xizmati bormi?", "Ba'zi filiallarda restoran mavjud, bo'lmasa yaqin atrofdagi eng yaxshi restoranlarni tavsiya qilamiz."),
+    ("Vegetarian yoki maxsus parhez taomlar mavjudmi?", "Ha, oldindan xabar bersangiz, vegetarian yoki boshqa parhez talablariga mos taom tayyorlab beramiz."),
+    ("Xonaga ovqat yetkazib berish (room service) xizmati bormi?", "Ha, cheklangan menyu asosida xonaga ovqat yetkazib berish xizmati mavjud."),
+    ("Yaqin atrofda choyxona yoki kafega yaqinmi?", "Ha, mehmonxona atrofida bir nechta mahalliy choyxona va kafelar mavjud."),
+    ("Ichimlik suvi bepulmi?", "Ha, xonada har kuni bepul ichimlik suvi taqdim etiladi."),
+    # 8. Qulayliklar va qo'shimcha xizmatlar
+    ("Bepul Wi-Fi butun hududda ishlaydimi?", "Ha, mehmonxonaning barcha hududida (xona, resepshn, hovli) bepul Wi-Fi mavjud."),
+    ("Kir yuvish xizmati bormi?", "Ha, pullik kir yuvish va dazmollash xizmati mavjud, ertasi kuni tayyor bo'ladi."),
+    ("Sayyohlik gidligi yoki ekskursiya tashkil qilib berasizlarmi?", "Ha, Buxoro bo'ylab shaharni ko'rish ekskursiyalarini tashkil qilib beramiz yoki ishonchli gidlar bilan bog'laymiz."),
+    ("24 soatlik resepshn ishlaydimi?", "Ha, resepshn xizmati kecha-kunduz ishlaydi."),
+    ("Konferensiya yoki tadbir uchun zal bormi?", "So'rov asosida kichik uchrashuvlar yoki oilaviy tadbirlar uchun joy tashkil qilib beramiz."),
+    ("Terassa yoki hovlida dam olish joyi bormi?", "Ha, an'anaviy Buxoro uslubidagi hovlida o'tirish va dam olish zonasi mavjud."),
+    ("Valyuta almashtirish xizmati bormi?", "Resepshn orqali yaqin atrofdagi ishonchli almashtirish shoxobchalarini tavsiya qilamiz."),
+    ("Sim-karta yoki mahalliy aloqa bo'yicha yordam berasizlarmi?", "Ha, mahalliy sim-karta olishda yordam beramiz va tavsiyalar taqdim etamiz."),
+    ("Chamodon/yuk ko'targich (concierge) xizmati bormi?", "Ha, xodimlarimiz yuklaringizni xonagacha olib borishda yordam beradi."),
+    ("Xonani bezash (romantik kechqurun, tug'ilgan kun) xizmati bormi?", "Ha, oldindan buyurtma bergan mehmonlar uchun xona bezash xizmatini tashkil qilamiz."),
+    # 9. Mehmonxona ichki qoidalari
+    ("Xonada chekish mumkinmi?", "Yo'q, barcha yopiq hududlarda chekish taqiqlangan, chekish uchun maxsus tashqi zona ajratilgan."),
+    ("Mehmon kutib olsam bo'ladimi (tashqi mehmon)?", "Ha, lekin tashqi mehmonlar kechqurun soat 22:00 gacha resepshnda ro'yxatdan o'tishi kerak."),
+    ("Tinchlik soatlari (quiet hours) bormi?", "Ha, soat 23:00 dan 07:00 gacha boshqa mehmonlarga xalaqit bermaslik so'raladi."),
+    ("Alkogol ichish mumkinmi?", "Umumiy hududlarda madaniy tarzda iste'mol qilish mumkin, ammo haddan tashqari shovqin va tartibsizlikka yo'l qo'yilmaydi."),
+    ("Xonada kir yuvish mashinasidan foydalansam bo'ladimi?", "Xonalarda shaxsiy kir yuvish mashinasi yo'q, mehmonxonaning kir yuvish xizmatidan foydalaning."),
+    ("Xona kalitini yo'qotib qo'ysam nima bo'ladi?", "Kalit almashtirish uchun belgilangan nominal to'lov olinadi."),
+    ("Mehmonxonada mulkka yetkazilgan zarar uchun javobgarlik bormi?", "Ha, mehmon o'z beparvoligi tufayli yetkazgan zarar uchun javobgar hisoblanadi, zarar bahosi joyida kelishiladi."),
+    ("Fotosurat yoki video suratga olish mumkinmi (ijtimoiy tarmoq uchun)?", "Ha, shaxsiy foydalanish uchun mumkin, faqat boshqa mehmonlarning roziligisiz ularni suratga olmaslikni so'raymiz."),
+    # 10. Bolalar, uy hayvonlari va maxsus ehtiyojlar
+    ("Bolalar bilan kelsam qulayliklar bormi?", "Ha, bolalar krovati (childcot) va qo'shimcha yostiq-ko'rpa so'rov asosida taqdim etiladi."),
+    ("Uy hayvonlari bilan turish mumkinmi?", "Ko'pchilik xonalarda uy hayvonlari qabul qilinmaydi, oldindan alohida so'rov qilsangiz ko'rib chiqamiz."),
+    ("Nogironligi bo'lgan mehmonlar uchun sharoit bormi?", "Kirish qismida pandus va birinchi qavatda qulay xonalar mavjud, oldindan xabar bering, moslashtirib beramiz."),
+    ("Homilador ayollar uchun maxsus sharoit bormi?", "Ha, tinch va qulay xona tanlab beramiz, zaruratda tibbiy yordam chaqirishda ko'maklashamiz."),
+    ("Katta yoshdagi (keksa) mehmonlar uchun qulayliklar bormi?", "Ha, birinchi qavat xonalari va liftga yaqin joylarni ustuvor ravishda taklif qilamiz."),
+    ("Bolalar uchun nonushta menyusi alohida bormi?", "Ha, so'rov bo'yicha bolalarga moslashtirilgan yengil taomlar tayyorlab beramiz."),
+    # 11. Xavfsizlik, Wi-Fi va texnik masalalar
+    ("Mehmonxonada video kuzatuv (CCTV) bormi?", "Ha, umumiy hududlarda (kirish, koridor, hovli) video kuzatuv tizimi o'rnatilgan."),
+    ("Yong'in xavfsizligi ta'minlanganmi?", "Ha, yong'in signalizatsiyasi va o't o'chirish uskunalari barcha qavatlarda mavjud."),
+    ("Qimmatbaho buyumlarimni qayerga saqlasam bo'ladi?", "Resepshnda seyf xizmatidan foydalanishingiz yoki xonadagi seyfdan foydalanishingiz mumkin."),
+    ("Wi-Fi ishlamasa nima qilishim kerak?", "Resepshnga murojaat qiling, texnik xodim tezda muammoni hal qiladi yoki routerni qayta ishga tushiradi."),
+    ("Elektr uzilib qolsa nima bo'ladi?", "Mehmonxonada zaxira generator mavjud, muhim tizimlar (yoritish, lift) uzilishsiz ishlashda davom etadi."),
+    ("Tungi vaqtda xavfsizlik xodimi bormi?", "Ha, kechqurun va tunda navbatchi xodim va qo'riqlash mavjud."),
+    # 12. Buxoro shahri va sayyohlik ma'lumotlari
+    ("Buxoroda qaysi diqqatga sazovor joylarni ko'rish tavsiya etiladi?", "Ark qal'asi, Poi Kalon majmuasi, Lyabi-Hovuz, Chor-Minor va Bolo-Hovuz masjidini albatta ko'ring."),
+    ("Bu joylargacha mehmonxonadan qancha vaqt ketadi?", "Ko'pchiligi piyoda 10-25 daqiqa, uzoqroqlari taksida 5-10 daqiqa masofada."),
+    ("Buxoroda eng yaxshi tashrif buyurish mavsumi qachon?", "Bahor (aprel-may) va kuz (sentyabr-oktyabr) oylari harorat qulay bo'lgani uchun eng maqbul mavsum hisoblanadi."),
+    ("Milliy hunarmandchilik bozorlarini qayerdan topsam bo'ladi?", "Toqi Zargaron va Toqi Sarrofon savdo gumbazlarida mahalliy hunarmandlar mahsulotlarini topasiz."),
+    ("Buxoroda kunlik qancha vaqt sarflash yetarli?", "To'liq tanishish uchun 2-3 kun tavsiya etiladi, shoshilinch dastur uchun 1 kun ham yetarli."),
+    ("Gid xizmatidan qanday foydalansam bo'ladi?", "Resepshnimiz orqali ingliz, rus yoki o'zbek tilida so'zlashuvchi litsenziyali gidlar bilan bog'lab beramiz."),
+    ("Buxoroda xarid qilish uchun nima tavsiya qilasiz?", "Ipak-gilam mahsulotlari, mis buyumlar, milliy kashta va kulolchilik ishlari mashhur suvenirlar hisoblanadi."),
+    ("Boshqa shaharlarga (Samarqand, Xiva) kunlik sayohat tashkil qilish mumkinmi?", "Ha, so'rov asosida haydovchi bilan mashina yoki poyezd chiptasi buyurtma qilishda yordam beramiz."),
+]
+
+FAQ_STOPWORDS = {
+    "qanday","qanaqa","bormi","bo'ladi","bo'ladimi","bo'lsa","bo'lgan","bo'lgani","mumkin",
+    "mumkinmi","uchun","bilan","yoki","ham","kerak","necha","nima","qachon","kim",
+    "qayerda","qayerdan","qaysi","qancha","olsam","qilsam","qilaman","qilsangiz","qilinadi",
+    "kelsam","kelsangiz","bersangiz","qilib","qiling","beramiz","berasiz","berasizlarmi",
+    "beriladi","olamiz","oling","olib","turaman","turasiz","turasizlarmi","hisoblanadi",
+    "qoysam","qolsam","kutib","tekshiring","yordam","yaqin","yaqinmi","atrofida","atrofda",
+    "ichida","tashkil","xizmat","xizmati","xizmatlari","mavjud","mavjudmi","alohida","ravishda",
+    "davomida","haqida","tomonidan","bo'ylab","oldin","keyin","o'zi","o'zida","ustuvor",
+    "katta","kichik","yaxshi","yomon","yangi","eski","tez","sekin","juda","albatta","balki",
+    "lekin","ammo","xayr","salom","salomlar","rahmat","tashakkur","iltimos","mayli","bugun",
+    "ertaga","kecha","hozir","hammaga","hamma","bizga","sizga","sizlar","bizlar","qilsangizchi",
+}
+
+def _faq_keywords(text):
+    text = text.lower().replace("-", "")
+    text = re.sub(r"[^a-z0-9Ѐ-ӿ']+", " ", text)
+    stems = set()
+    for w in text.split():
+        w = w.strip("'")
+        if len(w) >= 4 and w not in FAQ_STOPWORDS:
+            stems.add(w[:5])
+    return stems
+
+FAQ_INDEX = [(_faq_keywords(q), a) for q, a in FAQ_LIST]
+FAQ_STEM_DF = Counter()
+for _kw, _ in FAQ_INDEX:
+    for _k in _kw:
+        FAQ_STEM_DF[_k] += 1
+
+def find_faq_answer(text, threshold=0.9):
+    msg_kw = _faq_keywords(text)
+    if not msg_kw:
+        return None
+    best_score, best_answer = 0.0, None
+    for q_kw, answer in FAQ_INDEX:
+        common = msg_kw & q_kw
+        if not common:
+            continue
+        score = sum(1.0 / FAQ_STEM_DF[k] for k in common)
+        if score > best_score:
+            best_score, best_answer = score, answer
+    if best_score >= threshold:
+        return best_answer
+    return None
+
 async def group_auto_reply(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -312,11 +474,15 @@ async def group_auto_reply(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if any(kw in text_lower for kw in keywords):
             matched_topic = topic
             break
-    if not matched_topic:
+    if matched_topic:
+        reply = reception_faq(matched_topic)
+        if reply:
+            await update.message.reply_text(reply, parse_mode="Markdown")
         return
-    reply = reception_faq(matched_topic)
-    if reply:
-        await update.message.reply_text(reply, parse_mode="Markdown")
+    faq_answer = find_faq_answer(update.message.text)
+    if faq_answer:
+        await update.message.reply_text(faq_answer)
+
 
 async def health_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     kb = InlineKeyboardMarkup([
