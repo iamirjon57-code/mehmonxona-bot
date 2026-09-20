@@ -37,13 +37,13 @@ INCOME_CATS = [
 ]
 
 XONA_TURLARI = [
-    {"nom": "🛏️ SINGL ROOM",  "narx": "300,000 so'm/kecha"},
-    {"nom": "🛏️ DABL ROOM",   "narx": "450,000 so'm/kecha"},
-    {"nom": "🏨 TRIPLE ROOM", "narx": "800,000 so'm/kecha"},
+    {"nom": "🛏️ Xona",           "narx": "400,000 so'm/kecha", "joy": "📍 Labi Hovuz va Buxoro Aeroport"},
+    {"nom": "🛏️ Xona",           "narx": "450,000 so'm/kecha", "joy": "📍 Labi Hovuz"},
+    {"nom": "👨‍👩‍👧 Oilaviy hotel", "narx": "600,000 so'm/kecha", "joy": "📍 Labi Hovuz"},
 ]
 
 XIZMATLAR = [
-    "🍳 Restoran — 07:00–22:00 (nonushta narxga kiradi)",
+    "🍳 Restoran — 07:00–22:00",
     "📶 Bepul Wi-Fi — barcha xonalarda",
     "🚗 Aeroport transfer — bepul (band qilishda aytish kerak)",
     "👔 Kir yuvish xizmati — 24 soatda tayyor",
@@ -54,10 +54,9 @@ XIZMATLAR = [
 
 def reception_faq(topic):
     if topic == "narx":
-        lines = "\n".join(f"{x['nom']} — {x['narx']}" for x in XONA_TURLARI)
+        lines = "\n\n".join(f"{x['nom']} — {x['narx']}\n{x['joy']}" for x in XONA_TURLARI)
         return (
             f"💰 *Xona narxlarimiz:*\n\n{lines}\n\n"
-            f"✅ Barcha xonalarda nonushta narxga kiradi.\n"
             f"📞 Band qilish: +998 99 583 18 28"
         )
     elif topic == "band":
@@ -91,13 +90,13 @@ def reception_faq(topic):
         )
     elif topic == "manzil":
         return (
-            "📍 *Manzilimiz:*\n\nBuxoro sh.\n\n"
+            "📍 *Manzillarimiz (Buxoro sh.):*\n\n"
+            "• Labi Hovuz\n• Buxoro Aeroport\n\n"
             "📞 Tel: +998 99 583 18 28"
         )
     elif topic == "ovqat":
         return (
             "🍽️ *Ovqatlanish:*\n\n"
-            "🌅 Nonushta: 07:00–10:00 (narxga kiradi)\n"
             "☀️ Tushlik: 12:00–15:00\n"
             "🌙 Kechki: 18:00–22:00\n\n"
             "🛎️ Room service 24/7"
@@ -293,7 +292,7 @@ async def contact_info(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     return MENU
 
 GURUH_KEYWORDS = {
-    ("narx","qancha","price","necha"): "narx",
+    ("narx","qancha","price","necha","cost","qimmat","arzon","цена","цены","цену","сколько","стоимост","почём","pochem"): "narx",
     ("band","bron","rezerv","book"): "band",
     ("check","kirish vaqt","soat"): "checkin",
     ("xizmat","wifi","parking","spa"): "xizmat",
@@ -326,8 +325,7 @@ FAQ_LIST = [
     ("Xonada seyf (saqlash qutisi) bormi?", "Lyuks xonalarda seyf mavjud, boshqa xonalarda qimmatbaho buyumlaringizni administratorga saqlashga topshirishingiz mumkin."),
     ("Xonalar necha marta tozalanadi?", "Xonalar har kuni tozalanadi, choyshab va sochiqlar 2 kunda bir marta almashtiriladi (talab bo'yicha tezroq ham mumkin)."),
     # 3. Narxlar va to'lov usullari
-    ("Bir kechalik narx qancha?", "Narx xona turiga va mavsumga qarab farq qiladi; aniq narxni @hotelbuxhara narxlar kanalidan yoki botdan bilib olishingiz mumkin."),
-    ("Narxga nonushta kiradimi?", "Ko'pchilik tariflarda ha, bron qilishda aniq shartni tekshirib oling."),
+    ("Bir kechalik narx qancha?", "Narxlar: 400,000 so'm (Labi Hovuz va Buxoro Aeroport), 450,000 so'm (Labi Hovuz), 600,000 so'm (Oilaviy hotel, Labi Hovuz)."),
     ("To'lovni qanday amalga oshirsam bo'ladi?", "Naqd pul, plastik karta (UzCard/Humo) yoki bank o'tkazmasi orqali to'lash mumkin."),
     ("Chet el valyutasida to'lash mumkinmi?", "Ha, dollar yoki so'mda to'lash mumkin, kurs kunlik markaziy bank kursi bo'yicha hisoblanadi."),
     ("Uzoq muddat yashasam chegirma bormi?", "Ha, 7 kundan ortiq turadigan mehmonlarga individual chegirma taqdim etiladi, administrator bilan bog'laning."),
@@ -363,10 +361,7 @@ FAQ_LIST = [
     ("Shahar markaziga (Lyabi-Hovuz, Ark qal'asi) yetib borish qulaymi?", "Ha, ko'pchilik diqqatga sazovor joylar piyoda 10-20 daqiqa masofada joylashgan."),
     ("Taksi chaqirish uchun yordam berasizlarmi?", "Ha, resepshn xodimlari ishonchli taksi xizmatini chaqirib beradi yoki Yandex Go orqali buyurtma berishga yordamlashadi."),
     ("Boshqa shaharlardan (Toshkent, Samarqand) qanday yetib kelsam bo'ladi?", "Poyezd (Afrosiyob/Sharq), samolyot yoki avtobus orqali Buxoroga yetib, yuqoridagi transfer variantlaridan foydalanishingiz mumkin."),
-    # 7. Nonushta va ovqatlanish
-    ("Nonushta soat nechada beriladi?", "Nonushta har kuni soat 07:00 dan 10:00 gacha xizmat qiladi."),
-    ("Nonushta narxga kiradimi?", "Ko'pchilik tariflarda ha, bron qilishda aniq shartni tekshirib oling."),
-    ("Milliy taomlar bilan tanishtirasizlarmi?", "Ha, nonushtada mahalliy Buxoro taomlari (non, choy, murabbo, tuxum taomlari) taqdim etiladi."),
+    # 7. Ovqatlanish
     ("Tushlik va kechki ovqat xizmati bormi?", "Ba'zi filiallarda restoran mavjud, bo'lmasa yaqin atrofdagi eng yaxshi restoranlarni tavsiya qilamiz."),
     ("Vegetarian yoki maxsus parhez taomlar mavjudmi?", "Ha, oldindan xabar bersangiz, vegetarian yoki boshqa parhez talablariga mos taom tayyorlab beramiz."),
     ("Xonaga ovqat yetkazib berish (room service) xizmati bormi?", "Ha, cheklangan menyu asosida xonaga ovqat yetkazib berish xizmati mavjud."),
@@ -398,7 +393,6 @@ FAQ_LIST = [
     ("Nogironligi bo'lgan mehmonlar uchun sharoit bormi?", "Kirish qismida pandus va birinchi qavatda qulay xonalar mavjud, oldindan xabar bering, moslashtirib beramiz."),
     ("Homilador ayollar uchun maxsus sharoit bormi?", "Ha, tinch va qulay xona tanlab beramiz, zaruratda tibbiy yordam chaqirishda ko'maklashamiz."),
     ("Katta yoshdagi (keksa) mehmonlar uchun qulayliklar bormi?", "Ha, birinchi qavat xonalari va liftga yaqin joylarni ustuvor ravishda taklif qilamiz."),
-    ("Bolalar uchun nonushta menyusi alohida bormi?", "Ha, so'rov bo'yicha bolalarga moslashtirilgan yengil taomlar tayyorlab beramiz."),
     # 11. Xavfsizlik, Wi-Fi va texnik masalalar
     ("Mehmonxonada video kuzatuv (CCTV) bormi?", "Ha, umumiy hududlarda (kirish, koridor, hovli) video kuzatuv tizimi o'rnatilgan."),
     ("Yong'in xavfsizligi ta'minlanganmi?", "Ha, yong'in signalizatsiyasi va o't o'chirish uskunalari barcha qavatlarda mavjud."),
@@ -465,6 +459,12 @@ def find_faq_answer(text, threshold=0.9):
 
 async def group_auto_reply(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
+        return
+    # Kanal posti guruhga avtomatik ko'chirilganda (izohlar bo'limi ochilganda) javob bermaymiz;
+    # faqat mehmonlarning izohlariga javob beramiz.
+    if update.message.is_automatic_forward:
+        return
+    if update.message.from_user and update.message.from_user.is_bot:
         return
     text_lower = update.message.text.lower()
     if update.message.chat.type not in ("group", "supergroup"):
