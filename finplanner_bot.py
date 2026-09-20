@@ -45,9 +45,7 @@ XONA_TURLARI = [
 XIZMATLAR = [
     "🍳 Restoran — 07:00–22:00",
     "📶 Bepul Wi-Fi — barcha xonalarda",
-    "🚗 Aeroport transfer — bepul (band qilishda aytish kerak)",
     "👔 Kir yuvish xizmati — 24 soatda tayyor",
-    "💆 Spa & massaj — 10:00–21:00",
     "🅿️ Bepul parking — mehmonxona ichida",
     "🛎️ Room service — 24/7",
 ]
