@@ -8,6 +8,7 @@ from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKe
 from telegram.ext import (Application, CommandHandler, MessageHandler,
     CallbackQueryHandler, ContextTypes, filters, ConversationHandler)
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+import anthropic
 
 BOT_TOKEN = "8804626503:AAEAGQgsN-SkPCa5Y_rmEVe6GMdZQrgvT-E"
 DATA_DIR = "/app/data"
@@ -175,7 +176,7 @@ QOIDALAR = [
 
 (MENU, HOTEL_SELECT, HOTEL_AMOUNT,
  INCOME_CAT, INCOME_AMOUNT, EXPENSE_CAT, EXPENSE_AMOUNT,
- TASK_TEXT, TASK_TIME, BUDGET_SET, WEIGHT_LOG) = range(11)
+ TASK_TEXT, TASK_TIME, BUDGET_SET, WEIGHT_LOG, JARVIS) = range(12)
 
 def load_data():
     if os.path.exists(DATA_FILE):
@@ -205,6 +206,7 @@ MAIN_KB = ReplyKeyboardMarkup([
     ["🥗 Ovqat & Sog'liq",   "📅 Kun tartibi"],
     ["✅ Vazifalar",          "⚙️ Sozlamalar"],
     ["🛎️ Reception Bot",     "📞 Aloqa"],
+    ["🤖 Jarvis"],
 ], resize_keyboard=True)
 
 def hotel_kb():
@@ -859,6 +861,133 @@ async def evening_checkin(app):
             await app.bot.send_message(chat_id=int(uid), text=msg, parse_mode="Markdown")
         except: pass
 
+# ═══════════════ 🤖 JARVIS — AI yordamchi (Claude) ═══════════════
+JARVIS_MODEL = "claude-opus-5"
+JARVIS_HISTORY = 20  # xotirada saqlanadigan oxirgi xabarlar soni
+JARVIS_KB = ReplyKeyboardMarkup([["🧹 Suhbatni tozalash", "🔙 Orqaga"]], resize_keyboard=True)
+_jarvis_client = None
+
+JARVIS_SYSTEM = (
+    "Sen — Jarvis, FinPlanner Pro MAX Telegram botidagi shaxsiy AI yordamchisan. "
+    "Egang Buxorodagi bir nechta mehmonxonalarni boshqaradi. "
+    "Sen unga moliya (daromad, xarajat, byudjet), mehmonxona biznesi, mehmonlar bilan muloqot, "
+    "vazifalarni rejalashtirish, sog'liq va kundalik savollarda yordam berasan.\n\n"
+    "Qoidalar:\n"
+    "- Foydalanuvchi qaysi tilda yozsa, o'sha tilda javob ber (odatda o'zbek tilida, lotin yozuvida).\n"
+    "- Javoblar Telegram uchun: qisqa, aniq, kerak bo'lsa ro'yxat bilan. Uzun jadval va sarlavhalardan qoch.\n"
+    "- Summalarni so'mda, minglik ajratgich bilan yoz (masalan 1,250,000 so'm).\n"
+    "- Moliyaviy tahlil uchun faqat quyida berilgan foydalanuvchi ma'lumotlariga tayan; "
+    "ma'lumot bo'lmasa, o'ylab topma — shuni ayt.\n\n"
+    "Mehmonxonalar: " + ", ".join(h.replace("🏨 ", "") for h in HOTELS) + ".\n"
+    "Xona narxlari: " + "; ".join(f"{x['narx']} ({x['joy'].replace('📍 ', '')})" for x in XONA_TURLARI) + ".\n"
+    "Band qilish telefoni: +998 99 583 18 28."
+)
+
+def jarvis_client():
+    global _jarvis_client
+    if _jarvis_client is None:
+        _jarvis_client = anthropic.AsyncAnthropic()
+    return _jarvis_client
+
+def jarvis_snapshot(u):
+    """Foydalanuvchining joriy moliyaviy holati — Jarvis kontekstiga qo'shiladi."""
+    today = datetime.date.today()
+    month = today.strftime("%Y-%m")
+    exp_cats, inc_cats = Counter(), Counter()
+    for t in u["transactions"]:
+        if t.get("month") == month:
+            (exp_cats if t["type"] == "expense" else inc_cats)[t["category"]] += t["amount"]
+    lines = [
+        f"Bugun: {today.strftime('%d.%m.%Y')}",
+        f"Umumiy daromad: {u['income']:,.0f} so'm; umumiy xarajat: {u['expense']:,.0f} so'm; balans: {u['balance']:,.0f} so'm",
+        f"Oylik byudjet limiti: {u.get('budget_limit', 0):,.0f} so'm",
+    ]
+    if u["hotel_income"]:
+        lines.append("Mehmonxonalar bo'yicha jami daromad: " + "; ".join(
+            f"{h.replace('🏨 ', '')}: {v:,.0f}" for h, v in sorted(u["hotel_income"].items(), key=lambda x: -x[1])))
+    if inc_cats:
+        lines.append("Shu oy daromadlar: " + "; ".join(f"{c}: {v:,.0f}" for c, v in inc_cats.most_common()))
+    if exp_cats:
+        lines.append("Shu oy xarajatlar: " + "; ".join(f"{c}: {v:,.0f}" for c, v in exp_cats.most_common()))
+    recent = u["transactions"][-10:]
+    if recent:
+        lines.append("Oxirgi amallar: " + "; ".join(
+            f"{t['date']} {'+' if t['type'] == 'income' else '-'}{t['amount']:,.0f} {t['category']}" for t in recent))
+    if u["tasks"]:
+        lines.append("Vazifalar: " + "; ".join(
+            f"{t.get('text', '')} {t.get('time', '')}".strip() for t in u["tasks"] if isinstance(t, dict)))
+    return "\n".join(lines)
+
+async def jarvis_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        await update.message.reply_text(
+            "🤖 Jarvis hali sozlanmagan.\n\nServerda `ANTHROPIC_API_KEY` o'zgaruvchisini o'rnating.",
+            parse_mode="Markdown", reply_markup=MAIN_KB)
+        return MENU
+    ctx.user_data.setdefault("jarvis_history", [])
+    await update.message.reply_text(
+        "🤖 *Jarvis*\n━━━━━━━━━━━━━━━\n\n"
+        "Salom! Men sizning shaxsiy AI yordamchingizman.\n"
+        "Moliya, mehmonxonalar, mehmonlarga javob, reja — istalgan savolni yozing.\n\n"
+        "_Masalan: \"Bu oy qaysi xarajatni kamaytirishim kerak?\"_",
+        parse_mode="Markdown", reply_markup=JARVIS_KB)
+    return JARVIS
+
+async def jarvis_chat(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    if text == "🔙 Orqaga":
+        await update.message.reply_text("Asosiy menyu 👇", reply_markup=MAIN_KB)
+        return MENU
+    if text == "🧹 Suhbatni tozalash":
+        ctx.user_data["jarvis_history"] = []
+        await update.message.reply_text("🧹 Suhbat tozalandi.", reply_markup=JARVIS_KB)
+        return JARVIS
+
+    data = load_data(); u = get_user(data, update.effective_user.id)
+    history = ctx.user_data.setdefault("jarvis_history", [])
+    history.append({"role": "user", "content": text})
+    await ctx.bot.send_chat_action(update.effective_chat.id, "typing")
+    try:
+        resp = await jarvis_client().beta.messages.create(
+            model=JARVIS_MODEL,
+            max_tokens=4096,
+            betas=["server-side-fallback-2026-07-01"],
+            fallbacks="default",
+            output_config={"effort": "medium"},
+            system=[
+                {"type": "text", "text": JARVIS_SYSTEM, "cache_control": {"type": "ephemeral"}},
+                {"type": "text", "text": "Foydalanuvchi ma'lumotlari:\n" + jarvis_snapshot(u)},
+            ],
+            messages=history,
+        )
+    except anthropic.RateLimitError:
+        history.pop()
+        await update.message.reply_text("⏳ Jarvis band, birozdan so'ng qayta urinib ko'ring.")
+        return JARVIS
+    except (anthropic.APIStatusError, anthropic.APIConnectionError) as e:
+        history.pop()
+        print(f"Jarvis xatosi: {e}")
+        await update.message.reply_text("⚠️ Jarvis bilan bog'lanib bo'lmadi. Keyinroq urinib ko'ring.")
+        return JARVIS
+
+    if resp.stop_reason == "refusal":
+        history.pop()
+        await update.message.reply_text("🙅 Bu savolga javob bera olmayman.")
+        return JARVIS
+    answer = "".join(b.text for b in resp.content if b.type == "text").strip() or "🤔 Javob topilmadi."
+    history.append({"role": "assistant", "content": answer})
+    del history[:-JARVIS_HISTORY]
+    if history and history[0]["role"] != "user":
+        del history[0]
+
+    for i in range(0, len(answer), 4000):
+        chunk = answer[i:i+4000]
+        try:
+            await update.message.reply_text(chunk, parse_mode="Markdown", reply_markup=JARVIS_KB)
+        except Exception:
+            await update.message.reply_text(chunk, reply_markup=JARVIS_KB)
+    return JARVIS
+
 async def fallback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Menyudan tanlang:", reply_markup=MAIN_KB); return MENU
 
@@ -872,7 +1001,7 @@ async def post_init(app):
 def main():
     app=Application.builder().token(BOT_TOKEN).post_init(post_init).build()
     conv=ConversationHandler(
-        entry_points=[CommandHandler("start",start)],
+        entry_points=[CommandHandler("start",start),CommandHandler("jarvis",jarvis_start)],
         states={
             MENU:[
                 MessageHandler(filters.Regex("🏨 Mehmonxona daromad"),hotel_income_start),
@@ -887,6 +1016,7 @@ def main():
                 MessageHandler(filters.Regex("⚙️ Sozlamalar"),settings),
                 MessageHandler(filters.Regex("🛎️ Reception Bot"),reception_menu),
                 MessageHandler(filters.Regex("📞 Aloqa"),contact_info),
+                MessageHandler(filters.Regex("🤖 Jarvis"),jarvis_start),
                 CallbackQueryHandler(graph_callback,pattern="^graph_"),
                 CallbackQueryHandler(report_callback,pattern="^rep_"),
                 CallbackQueryHandler(health_callback,pattern="^(meal_|mashq_|qoidalar|vazn_|kunlik_menyu)"),
@@ -904,6 +1034,7 @@ def main():
             TASK_TIME:[MessageHandler(filters.TEXT&~filters.COMMAND,task_time_handler)],
             BUDGET_SET:[MessageHandler(filters.TEXT&~filters.COMMAND,budget_set)],
             WEIGHT_LOG:[MessageHandler(filters.TEXT&~filters.COMMAND,weight_log_save)],
+            JARVIS:[MessageHandler(filters.TEXT&~filters.COMMAND,jarvis_chat)],
         },
         fallbacks=[MessageHandler(filters.ALL,fallback)],
         allow_reentry=True
